@@ -6,9 +6,13 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import ReactMarkdown from 'react-markdown';
-import { Copy, Download, FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { Copy, Download, FileText, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import type { SpecDocument } from '@/lib/types';
+
+// Stable empty array reference to prevent re-render loops
+const EMPTY_DOCUMENTS: SpecDocument[] = [];
 
 const confidenceColors = {
   high: 'bg-status-complete/20 text-status-complete border-status-complete/30',
@@ -17,12 +21,10 @@ const confidenceColors = {
 };
 
 export function ResultsViewer() {
-  const runContext = useOrchestratorStore((state) => state.runContext);
+  const documents = useOrchestratorStore((state) => state.runContext?.documents ?? EMPTY_DOCUMENTS);
   const selectedDocumentId = useOrchestratorStore((state) => state.selectedDocumentId);
   const selectDocument = useOrchestratorStore((state) => state.selectDocument);
   const [copied, setCopied] = useState(false);
-  
-  const documents = runContext?.documents ?? [];
   const selectedDocument = documents.find((d) => d.id === selectedDocumentId);
   
   const handleCopy = async () => {

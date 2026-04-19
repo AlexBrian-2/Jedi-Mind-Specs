@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useOrchestratorStore } from '@/lib/orchestrator-store';
 import type { Agent, AgentStatus } from '@/lib/types';
 import { AGENT_HIERARCHY } from '@/lib/types';
@@ -19,7 +19,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { useState } from 'react';
 
 const statusConfig: Record<AgentStatus, { icon: typeof Clock; className: string; label: string }> = {
   idle: { icon: Circle, className: 'text-status-idle', label: 'Idle' },
@@ -33,17 +32,6 @@ interface AgentNodeProps {
   agent: Agent;
   children?: Agent[];
   depth: number;
-}
-
-function formatElapsedTime(startTime: number | null): string {
-  if (!startTime) return '';
-  const elapsed = Date.now() - startTime;
-  const seconds = Math.floor(elapsed / 1000);
-  const minutes = Math.floor(seconds / 60);
-  if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  }
-  return `${seconds}s`;
 }
 
 function AgentNode({ agent, children, depth }: AgentNodeProps) {
@@ -106,9 +94,9 @@ function AgentNode({ agent, children, depth }: AgentNodeProps) {
             )}
           </div>
           
-          {agent.status === 'active' && agent.startTime && (
+          {agent.status === 'active' && (
             <span className="text-xs font-mono text-status-active">
-              {formatElapsedTime(agent.startTime)}
+              ...
             </span>
           )}
         </div>
@@ -125,49 +113,70 @@ function AgentNode({ agent, children, depth }: AgentNodeProps) {
   );
 }
 
+// Use a stable selector that only picks agent-specific data
 function AgentNodeWithChildren({ agentId, depth }: { agentId: string; depth: number }) {
-  const runContext = useOrchestratorStore((state) => state.runContext);
+  // Select only the specific agent data needed
+  const agentState = useOrchestratorStore(
+    useCallback((state) => state.runContext?.agents[agentId], [agentId])
+  );
   
-  const agent = runContext?.agents[agentId] ?? AGENT_HIERARCHY.find((a) => a.id === agentId);
-  if (!agent) return null;
+  // Get static definition
+  const agentDef = useMemo(
+    () => AGENT_HIERARCHY.find((a) => a.id === agentId),
+    [agentId]
+  );
   
-  const fullAgent: Agent = {
-    ...AGENT_HIERARCHY.find((a) => a.id === agentId)!,
-    status: (agent as Agent).status ?? 'idle',
-    currentAction: (agent as Agent).currentAction ?? null,
-    startTime: (agent as Agent).startTime ?? null,
+  if (!agentDef) return null;
+  
+  const agent: Agent = {
+    ...agentDef,
+    status: agentState?.status ?? 'idle',
+    currentAction: agentState?.currentAction ?? null,
+    startTime: agentState?.startTime ?? null,
   };
   
-  const children = AGENT_HIERARCHY.filter((a) => a.parentId === agentId).map((def) => {
-    const state = runContext?.agents[def.id];
-    return {
-      ...def,
-      status: state?.status ?? 'idle',
-      currentAction: state?.currentAction ?? null,
-      startTime: state?.startTime ?? null,
-    } as Agent;
-  });
+  // Get children definitions (static)
+  const childDefs = useMemo(
+    () => AGENT_HIERARCHY.filter((a) => a.parentId === agentId),
+    [agentId]
+  );
   
-  return <AgentNode agent={fullAgent} children={children} depth={depth} />;
+  // Get children states from store - use a selector that returns stable reference
+  const childrenStates = useOrchestratorStore(
+    useCallback((state) => {
+      if (!state.runContext) return null;
+      return childDefs.map((def) => state.runContext!.agents[def.id]);
+    }, [childDefs])
+  );
+  
+  const children: Agent[] = childDefs.map((def, i) => ({
+    ...def,
+    status: childrenStates?.[i]?.status ?? 'idle',
+    currentAction: childrenStates?.[i]?.currentAction ?? null,
+    startTime: childrenStates?.[i]?.startTime ?? null,
+  }));
+  
+  return <AgentNode agent={agent} children={children.length > 0 ? children : undefined} depth={depth} />;
 }
 
 export function AgentTree() {
-  const runContext = useOrchestratorStore((state) => state.runContext);
+  // Use specific selectors to avoid unnecessary re-renders
+  const agents = useOrchestratorStore((state) => state.runContext?.agents);
   
-  // Get stats
+  // Get stats with a memoized calculation
   const stats = useMemo(() => {
-    if (!runContext) {
+    if (!agents) {
       return { total: 22, active: 0, complete: 0, pending: 22 };
     }
     
-    const agents = Object.values(runContext.agents);
+    const agentList = Object.values(agents);
     return {
-      total: agents.length,
-      active: agents.filter((a) => a.status === 'active').length,
-      complete: agents.filter((a) => a.status === 'complete').length,
-      pending: agents.filter((a) => a.status === 'idle').length,
+      total: agentList.length,
+      active: agentList.filter((a) => a.status === 'active').length,
+      complete: agentList.filter((a) => a.status === 'complete').length,
+      pending: agentList.filter((a) => a.status === 'idle').length,
     };
-  }, [runContext]);
+  }, [agents]);
   
   return (
     <div className="flex flex-col h-full">

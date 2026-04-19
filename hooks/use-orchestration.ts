@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from 'react';
 import { useOrchestratorStore } from '@/lib/orchestrator-store';
-import type { RunConfig, SpecDocument, WorkflowState } from '@/lib/types';
+import type { RunConfig, SpecDocument } from '@/lib/types';
 import { AGENT_HIERARCHY } from '@/lib/types';
 
 // Agent execution order for research phase
@@ -15,33 +15,35 @@ const RESEARCH_AGENTS = [
   ['tech-stack', 'planning', 'architecture', 'best-practices'],
 ];
 
-// Flatten for sequential execution
-const ALL_RESEARCH_AGENTS = RESEARCH_AGENTS.flat();
-
 interface UseOrchestrationReturn {
   runOrchestration: (config: RunConfig) => Promise<void>;
   isRunning: boolean;
 }
 
+// Get store actions directly to avoid subscription loops
+const getStoreActions = () => {
+  const state = useOrchestratorStore.getState();
+  return {
+    startRun: state.startRun,
+    updateAgentStatus: state.updateAgentStatus,
+    setAgentComplete: state.setAgentComplete,
+    setWorkflowState: state.setWorkflowState,
+    addDocument: state.addDocument,
+    addLog: state.addLog,
+    incrementApiCallCount: state.incrementApiCallCount,
+  };
+};
+
 export function useOrchestration(): UseOrchestrationReturn {
   const isRunning = useOrchestratorStore((state) => state.isRunning);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
-  const {
-    startRun,
-    updateAgentStatus,
-    setAgentComplete,
-    setWorkflowState,
-    addDocument,
-    addLog,
-    incrementApiCallCount,
-  } = useOrchestratorStore();
   
   const executeAgent = useCallback(async (
     config: RunConfig, 
     agentId: string,
     signal: AbortSignal
   ): Promise<SpecDocument | null> => {
+    const { updateAgentStatus, addLog, incrementApiCallCount, setAgentComplete } = getStoreActions();
     const agent = AGENT_HIERARCHY.find(a => a.id === agentId);
     if (!agent) return null;
     
@@ -129,9 +131,18 @@ export function useOrchestration(): UseOrchestrationReturn {
       addLog(agentId, agent.name, `Error: ${error}`, 'error');
       return null;
     }
-  }, [updateAgentStatus, setAgentComplete, addLog, incrementApiCallCount]);
+  }, []);
   
   const runOrchestration = useCallback(async (config: RunConfig) => {
+    const { 
+      startRun, 
+      updateAgentStatus, 
+      setAgentComplete, 
+      setWorkflowState, 
+      addDocument, 
+      addLog 
+    } = getStoreActions();
+    
     // Create abort controller
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
@@ -261,7 +272,7 @@ export function useOrchestration(): UseOrchestrationReturn {
     addLog('master', 'Master Agent', `Research run complete. Generated ${documents.length + 1} specification documents.`, 'success');
     
     setWorkflowState('complete');
-  }, [startRun, setWorkflowState, updateAgentStatus, setAgentComplete, addDocument, addLog, executeAgent]);
+  }, [executeAgent]);
   
   return {
     runOrchestration,

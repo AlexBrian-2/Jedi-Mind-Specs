@@ -36,8 +36,12 @@ const WORKFLOW_ORDER: WorkflowState[] = [
 ];
 
 export function WorkflowStatus() {
-  const runContext = useOrchestratorStore((state) => state.runContext);
-  const currentState = runContext?.workflowState ?? 'idle';
+  const currentState = useOrchestratorStore((state) => state.runContext?.workflowState ?? 'idle');
+  const reviewCycles = useOrchestratorStore((state) => state.runContext?.reviewCycles ?? 0);
+  const maxReviewCycles = useOrchestratorStore((state) => state.runContext?.maxReviewCycles ?? 3);
+  const validationCycles = useOrchestratorStore((state) => state.runContext?.validationCycles ?? 0);
+  const maxValidationCycles = useOrchestratorStore((state) => state.runContext?.maxValidationCycles ?? 2);
+  const hasRunContext = useOrchestratorStore((state) => !!state.runContext);
   const currentIndex = WORKFLOW_ORDER.indexOf(currentState);
   
   return (
@@ -46,10 +50,10 @@ export function WorkflowStatus() {
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
           Workflow Status
         </h3>
-        {runContext && (
+        {hasRunContext && (
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span>Review: {runContext.reviewCycles}/{runContext.maxReviewCycles}</span>
-            <span>Validation: {runContext.validationCycles}/{runContext.maxValidationCycles}</span>
+            <span>Review: {reviewCycles}/{maxReviewCycles}</span>
+            <span>Validation: {validationCycles}/{maxValidationCycles}</span>
           </div>
         )}
       </div>

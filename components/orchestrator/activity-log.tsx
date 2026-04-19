@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useOrchestratorStore } from '@/lib/orchestrator-store';
 import type { LogEntry } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Terminal, Info, AlertTriangle, XCircle, CheckCircle2 } from 'lucide-react';
+
+// Stable empty array reference to prevent re-render loops
+const EMPTY_LOGS: LogEntry[] = [];
 
 const levelConfig: Record<LogEntry['level'], { icon: typeof Info; className: string }> = {
   info: { icon: Info, className: 'text-chart-4' },
@@ -39,7 +42,7 @@ function LogEntryItem({ entry }: { entry: LogEntry }) {
 }
 
 export function ActivityLog() {
-  const logs = useOrchestratorStore((state) => state.runContext?.logs ?? []);
+  const logs = useOrchestratorStore((state) => state.runContext?.logs ?? EMPTY_LOGS);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // Auto-scroll to bottom when new logs are added

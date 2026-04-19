@@ -15,7 +15,8 @@ function formatTimeRemaining(resetTime: Date): string {
 
 export function RateLimitWidget() {
   const rateLimitState = useOrchestratorStore((state) => state.rateLimitState);
-  const runContext = useOrchestratorStore((state) => state.runContext);
+  const apiCallCount = useOrchestratorStore((state) => state.runContext?.apiCallCount ?? 0);
+  const hasRunContext = useOrchestratorStore((state) => !!state.runContext);
   const [timeRemaining, setTimeRemaining] = useState('--:--');
   
   useEffect(() => {
@@ -66,10 +67,10 @@ export function RateLimitWidget() {
       </div>
       
       {/* Total API Calls */}
-      {runContext && (
+      {hasRunContext && (
         <div className="ml-auto flex items-center gap-2 text-muted-foreground">
           <span>Total calls this run:</span>
-          <span className="font-mono font-medium text-foreground">{runContext.apiCallCount}</span>
+          <span className="font-mono font-medium text-foreground">{apiCallCount}</span>
         </div>
       )}
     </div>

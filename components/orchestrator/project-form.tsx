@@ -33,7 +33,8 @@ const MODELS = [
 ];
 
 export function ProjectForm() {
-  const { isRunning, cancelRun } = useOrchestratorStore();
+  const isRunning = useOrchestratorStore((state) => state.isRunning);
+  const cancelRun = useOrchestratorStore((state) => state.cancelRun);
   const { runOrchestration } = useOrchestration();
   const [showAdvanced, setShowAdvanced] = useState(false);
   
